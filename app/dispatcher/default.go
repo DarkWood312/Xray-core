@@ -205,37 +205,39 @@ func WrapLink(ctx context.Context, policyManager policy.Manager, statsManager st
 		}
 
 		if p.Stats.UserUplink {
-			name := "user>>>" + user.Email + ">>>traffic>>>uplink"
 			counters := []stats.Counter{}
-			if c, _ := stats.GetOrRegisterCounter(statsManager, name); c != nil {
+
+			// штатный счётчик — НЕ трогаем, его потребляет Remnawave
+			if c, _ := stats.GetOrRegisterCounter(statsManager,
+				"user>>>"+user.Email+">>>traffic>>>uplink"); c != nil {
 				counters = append(counters, c)
 			}
+
+			// наш счётчик в отдельном namespace: xstat>>>{email}>>>{tag}>>>traffic>>>uplink
 			if inboundTag != "" {
-				combName := "user>>>" + user.Email + ">>>inbound>>>" + inboundTag + ">>>traffic>>>uplink"
-				if cc, _ := stats.GetOrRegisterCounter(statsManager, combName); cc != nil {
+				name := statsNS + ">>>" + user.Email + ">>>" + inboundTag + ">>>traffic>>>uplink"
+				if cc, _ := stats.GetOrRegisterCounter(statsManager, name); cc != nil {
 					counters = append(counters, cc)
 				}
 			}
+
 			if len(counters) > 0 {
 				link.Reader.(*buf.TimeoutWrapperReader).Counter = &multiCounter{counters: counters}
 			}
 		}
 
 		if p.Stats.UserDownlink {
-			name := "user>>>" + user.Email + ">>>traffic>>>downlink"
-			if c, _ := stats.GetOrRegisterCounter(statsManager, name); c != nil {
-				link.Writer = &SizeStatWriter{
-					Counter: c,
-					Writer:  link.Writer,
-				}
+			// штатный счётчик — НЕ трогаем
+			if c, _ := stats.GetOrRegisterCounter(statsManager,
+				"user>>>"+user.Email+">>>traffic>>>downlink"); c != nil {
+				link.Writer = &SizeStatWriter{Counter: c, Writer: link.Writer}
 			}
+
+			// наш счётчик в отдельном namespace
 			if inboundTag != "" {
-				combName := "user>>>" + user.Email + ">>>inbound>>>" + inboundTag + ">>>traffic>>>downlink"
-				if cc, _ := stats.GetOrRegisterCounter(statsManager, combName); cc != nil {
-					link.Writer = &SizeStatWriter{
-						Counter: cc,
-						Writer:  link.Writer,
-					}
+				name := statsNS + ">>>" + user.Email + ">>>" + inboundTag + ">>>traffic>>>downlink"
+				if cc, _ := stats.GetOrRegisterCounter(statsManager, name); cc != nil {
+					link.Writer = &SizeStatWriter{Counter: cc, Writer: link.Writer}
 				}
 			}
 		}
